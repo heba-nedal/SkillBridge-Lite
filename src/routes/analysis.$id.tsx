@@ -3,6 +3,9 @@ import { Page } from "@/components/ui-kit";
 import { FitAnalysis } from "@/components/fit-analysis";
 import { getOpportunity } from "@/lib/opportunities";
 import { useProfile } from "@/lib/store";
+import { useServerFn } from "@tanstack/react-start";
+import { analyzeFitFn } from "@/lib/fit-analysis.functions";
+import { AnalysisFailure, type AnalysisRequest } from "@/lib/fit-analysis";
 
 export const Route = createFileRoute("/analysis/$id")({
   loader: ({ params }) => {
@@ -26,6 +29,12 @@ export const Route = createFileRoute("/analysis/$id")({
 function AnalysisPage() {
   const { opportunity: o } = Route.useLoaderData();
   const { activeProfile, isSample } = useProfile();
+  const analyzeFit = useServerFn(analyzeFitFn);
+  const request: AnalysisRequest = async ({ profile, opportunity }) => {
+    const out = await analyzeFit({ data: { profile, opportunityId: opportunity.id } });
+    if (!out.ok) throw new AnalysisFailure(out.kind, out.message);
+    return out.result;
+  };
 
   return (
     <Page>
@@ -35,7 +44,7 @@ function AnalysisPage() {
         {activeProfile.name || "Your profile"}{isSample && " (sample profile)"} · {o.title} at {o.company}
       </p>
 
-      <FitAnalysis key={JSON.stringify([o.id, activeProfile])} profile={activeProfile} opportunity={o} />
+      <FitAnalysis key={JSON.stringify([o.id, activeProfile])} profile={activeProfile} opportunity={o} request={request} />
     </Page>
   );
 }
