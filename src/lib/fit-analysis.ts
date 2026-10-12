@@ -1,15 +1,27 @@
 import type { Opportunity } from "./opportunities";
 import type { Profile } from "./store";
 
+export type RelevantSkill = { item: string; evidence: string; relevance: string };
+export type PotentialGap = { requirement: string; reason: string };
+export type NextStep = { action: string; reason: string };
+
 export type FitResult = {
-  relevantSkills: string[];
-  potentialGaps: string[];
-  recommendedNextSteps: string[];
+  relevantSkills: RelevantSkill[];
+  potentialGaps: PotentialGap[];
+  recommendedNextSteps: NextStep[];
 };
 
 export type AnalysisState =
-  | { status: "idle" | "analyzing" | "insufficient" | "unavailable" | "error" }
+  | { status: "idle" | "analyzing" | "insufficient" | "invalid" }
+  | { status: "unavailable" | "error"; message?: string }
   | { status: "success"; result: FitResult };
+
+/** Thrown by an adapter to report a specific failure kind; never carries fabricated results. */
+export class AnalysisFailure extends Error {
+  constructor(public kind: "unavailable" | "invalid" | "error", message?: string) {
+    super(message ?? kind);
+  }
+}
 
 // An adapter must return actual service results, never local example matches.
 export type AnalysisRequest = (input: {
@@ -23,12 +35,19 @@ export function hasEnoughData(profile: Profile): boolean {
     && Boolean(profile.projects.trim() || profile.experience.trim());
 }
 
+const nonEmpty = (v: unknown) => typeof v === "string" && v.trim().length > 0;
+function listOf(value: unknown, keys: string[]): boolean {
+  return Array.isArray(value) && value.every((item) =>
+    item && typeof item === "object" && keys.every((k) => nonEmpty((item as Record<string, unknown>)[k])));
+}
+
 export function isFitResult(value: unknown): value is FitResult {
   if (!value || typeof value !== "object") return false;
-  return ["relevantSkills", "potentialGaps", "recommendedNextSteps"].every((key) => {
-    const items = (value as Record<string, unknown>)[key];
-    return Array.isArray(items) && items.every((item) => typeof item === "string" && item.trim().length > 0);
-  });
+  const v = value as Record<string, unknown>;
+  if (Object.keys(v).sort().join() !== "potentialGaps,recommendedNextSteps,relevantSkills") return false;
+  return listOf(v.relevantSkills, ["item", "evidence", "relevance"])
+    && listOf(v.potentialGaps, ["requirement", "reason"])
+    && listOf(v.recommendedNextSteps, ["action", "reason"]);
 }
 
 export async function runFitAnalysis(
@@ -51,9 +70,13 @@ export async function runFitAnalysis(
   try {
     const result = await request({ profile, opportunity, signal });
     if (signal.aborted) return;
-    if (!isFitResult(result)) throw new Error("Invalid analysis response");
+    if (!isFitResult(result)) throw new AnalysisFailure("invalid");
     update({ status: "success", result });
-  } catch {
-    if (!signal.aborted) update({ status: "error" });
+  } catch (e) {
+    if (signal.aborted) return;
+    if (e instanceof AnalysisFailure) {
+      if (e.kind === "invalid") update({ status: "invalid" });
+      else update({ status: e.kind, message: e.message !== e.kind ? e.message : undefined });
+    } else update({ status: "error" });
   }
 }
