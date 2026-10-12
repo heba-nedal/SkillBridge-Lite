@@ -34,7 +34,7 @@ describe("Fit analysis states", () => {
   it("shows analyzing only during a pending request, then uses the returned result", async () => {
     const states: AnalysisState[] = [{ status: "idle" }];
     let finish: ((result: FitResult) => void) | undefined;
-    const returned: FitResult = { relevantSkills: ["Service-reported skill"], potentialGaps: [], recommendedNextSteps: ["Service-reported next step"] };
+    const returned: FitResult = { relevantSkills: [{ item: "Python", evidence: "Lists Python", relevance: "Required" }], potentialGaps: [], recommendedNextSteps: [{ action: "Build a bot", reason: "Shows automation" }] };
     const pending = runFitAnalysis(SAMPLE_PROFILE, opportunity(), () => new Promise((resolve) => { finish = resolve; }), (state) => states.push(state), new AbortController().signal);
     expect(states.map((state) => state.status)).toEqual(["idle", "analyzing"]);
     if (!finish) throw new Error("Request was not started");
@@ -52,7 +52,7 @@ describe("Fit analysis states", () => {
   it("rejects malformed service output", async () => {
     const update = vi.fn();
     await runFitAnalysis(SAMPLE_PROFILE, opportunity(), async () => ({ relevantSkills: [3] } as unknown as FitResult), update, new AbortController().signal);
-    expect(update).toHaveBeenLastCalledWith({ status: "error" });
+    expect(update).toHaveBeenLastCalledWith({ status: "invalid" });
   });
 
   it("does not publish a stale result after cancellation", async () => {
@@ -63,5 +63,13 @@ describe("Fit analysis states", () => {
       return { relevantSkills: [], potentialGaps: [], recommendedNextSteps: [] };
     }, update, controller.signal);
     expect(update.mock.calls).toEqual([[{ status: "analyzing" }]]);
+  });
+});
+describe("Fit result validation", () => {
+  it("rejects string items and extra top-level fields", async () => {
+    const { isFitResult } = await import("@/lib/fit-analysis");
+    expect(isFitResult({ relevantSkills: ["Python"], potentialGaps: [], recommendedNextSteps: [] })).toBe(false);
+    expect(isFitResult({ relevantSkills: [], potentialGaps: [], recommendedNextSteps: [], score: 9 })).toBe(false);
+    expect(isFitResult({ relevantSkills: [{ item: "a", evidence: "b", relevance: "c" }], potentialGaps: [{ requirement: "r", reason: "x" }], recommendedNextSteps: [{ action: "a", reason: "b" }] })).toBe(true);
   });
 });
