@@ -4,7 +4,7 @@ import { SAMPLE_PROFILE } from "@/lib/store";
 import { getOpportunity } from "@/lib/opportunities";
 
 function opportunity() {
-  const value = getOpportunity("1");
+  const value = getOpportunity("ai-automation-intern");
   if (!value) throw new Error("Missing test opportunity");
   return value;
 }
