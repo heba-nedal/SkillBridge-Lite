@@ -13,7 +13,7 @@ export type FitResult = {
 
 export type AnalysisState =
   | { status: "idle" | "analyzing" | "insufficient" | "invalid" }
-  | { status: "unavailable" | "error"; message?: string }
+  | { status: "unavailable" | "error"; message?: string | undefined }
   | { status: "success"; result: FitResult };
 
 /** Thrown by an adapter to report a specific failure kind; never carries fabricated results. */
@@ -45,9 +45,9 @@ export function isFitResult(value: unknown): value is FitResult {
   if (!value || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
   if (Object.keys(v).sort().join() !== "potentialGaps,recommendedNextSteps,relevantSkills") return false;
-  return listOf(v.relevantSkills, ["item", "evidence", "relevance"])
-    && listOf(v.potentialGaps, ["requirement", "reason"])
-    && listOf(v.recommendedNextSteps, ["action", "reason"]);
+  return listOf(v["relevantSkills"], ["item", "evidence", "relevance"])
+    && listOf(v["potentialGaps"], ["requirement", "reason"])
+    && listOf(v["recommendedNextSteps"], ["action", "reason"]);
 }
 
 export async function runFitAnalysis(
