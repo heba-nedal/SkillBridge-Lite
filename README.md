@@ -1,10 +1,8 @@
-# Implementation Perfect
-
-Implement exactly the screenshot and nothing else
+# SkillBridge Lite — AI-Powered Career Fit Assistant
 
 This project was built with [Lovable](https://lovable.dev).
 
-**Live app**: https://implementation-perfect.lovable.app
+**Live app**: https://skill-bridge-lite-by-heba.lovable.app
 
 ## Build with Lovable
 
